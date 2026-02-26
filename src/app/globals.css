@@ -1,0 +1,128 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=Sora:wght@300;400;500;600;700&display=swap');
+
+:root {
+  --font-sans: 'Sora', system-ui, sans-serif;
+  --font-mono: 'DM Mono', monospace;
+  --font-display: 'Sora', system-ui, sans-serif;
+
+  /* Brand palette */
+  --bg-base:     #0c0e14;
+  --bg-surface:  #111318;
+  --bg-raised:   #161921;
+  --bg-overlay:  #1c1f2a;
+  --border:      rgba(255,255,255,0.06);
+  --border-med:  rgba(255,255,255,0.10);
+  --accent:      #3b82f6;   /* blue-500 */
+  --accent-dim:  rgba(59,130,246,0.15);
+  --gold:        #f59e0b;   /* amber for financial numbers */
+  --gold-dim:    rgba(245,158,11,0.12);
+  --success:     #10b981;
+  --danger:      #ef4444;
+}
+
+* { box-sizing: border-box; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: var(--bg-base); }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.14); }
+
+/* Base surface cards */
+.card {
+  @apply bg-[#111318] border border-white/[0.06] rounded-lg;
+}
+.card-raised {
+  @apply bg-[#161921] border border-white/[0.08] rounded-lg;
+}
+
+/* Badge base */
+.badge {
+  @apply inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ring-1 ring-inset;
+}
+
+/* Financial number styling */
+.fin-num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Metric card */
+.metric-card {
+  @apply card p-4;
+}
+.metric-label {
+  @apply text-xs text-slate-500 uppercase tracking-widest font-medium;
+}
+.metric-value {
+  @apply text-2xl font-semibold fin-num mt-1;
+}
+
+/* Table */
+.data-table {
+  @apply w-full text-sm;
+}
+.data-table thead tr {
+  @apply border-b border-white/[0.06];
+}
+.data-table thead th {
+  @apply px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap;
+}
+.data-table tbody tr {
+  @apply border-b border-white/[0.04] transition-colors cursor-pointer;
+}
+.data-table tbody tr:hover td {
+  @apply bg-white/[0.02];
+}
+.data-table tbody td {
+  @apply px-4 py-3;
+}
+.data-table tbody tr:last-child {
+  @apply border-0;
+}
+
+/* Input base */
+.input {
+  @apply w-full bg-[#1c1f2a] border border-white/[0.08] rounded-md px-3 py-2 text-sm text-slate-100
+         placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-500/40
+         focus:border-blue-500/40 transition-colors;
+}
+
+/* Select base */
+.select {
+  @apply input appearance-none;
+}
+
+/* Animated score bar */
+.score-bar {
+  @apply h-1.5 rounded-full overflow-hidden bg-white/[0.06];
+}
+.score-bar-fill {
+  @apply h-full rounded-full transition-all duration-700;
+}
+
+/* Sidebar active */
+.nav-item {
+  @apply flex items-center gap-2.5 px-3 py-2 rounded-md text-sm text-slate-400
+         hover:text-slate-200 hover:bg-white/[0.04] transition-colors;
+}
+.nav-item.active {
+  @apply bg-white/[0.06] text-slate-100;
+}
+
+/* Capital bar */
+.capital-bar {
+  background: linear-gradient(90deg, #3b82f6 0%, #6366f1 100%);
+}
+
+/* Subtle glow on key metrics */
+.glow-blue {
+  box-shadow: 0 0 20px rgba(59,130,246,0.08);
+}
+.glow-gold {
+  box-shadow: 0 0 20px rgba(245,158,11,0.08);
+}

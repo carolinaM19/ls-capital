@@ -1,0 +1,351 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── AUTH ────────────────────────────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  role          UserRole  @default(ANALYST)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts  Account[]
+  sessions  Session[]
+  notes     DealNote[]
+  auditLogs DealAuditLog[]
+  deals     Deal[]     @relation("AssignedDeals")
+
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// ─── DEALS ───────────────────────────────────────────────────────────────────
+
+model Deal {
+  id              String       @id @default(cuid())
+  // Location
+  address         String
+  city            String
+  state           String       // 2-char
+  zip             String?
+  county          String?
+  lat             Float?
+  lng             Float?
+  // Property
+  assetType       AssetType    @default(SFR)
+  units           Int          @default(1)
+  sqFt            Int?
+  yearBuilt       Int?
+  lotSize         Float?       // acres
+  bedrooms        Int?
+  bathrooms       Float?
+  // Deal
+  dealType        DealType     @default(ON_MARKET)
+  status          DealStatus   @default(NEW)
+  askingPrice     BigInt?      // cents
+  listingDate     DateTime?
+  daysOnMarket    Int?
+  sourceUrl       String?
+  brokerName      String?
+  brokerEmail     String?
+  brokerPhone     String?
+  description     String?      @db.Text
+  // Income
+  grossMonthlyRent     BigInt? // cents — total market rent
+  currentMonthlyRent   BigInt? // cents — in-place rent
+  occupancyRate        Decimal? @db.Decimal(5, 2)
+  // Expenses & assumptions (stored per-deal, default from config)
+  vacancyRate          Decimal? @db.Decimal(5, 2)   // e.g. 5.00 = 5%
+  expenseRatio         Decimal? @db.Decimal(5, 2)   // e.g. 40.00 = 40% of EGI
+  rentGrowthRate       Decimal? @db.Decimal(5, 2)   // e.g. 3.00 = 3%/yr
+  // Underwriting outputs (computed & stored)
+  loanAmount           BigInt?  // cents
+  monthlyPayment       BigInt?  // cents
+  annualDebtService    BigInt?  // cents
+  noi                  BigInt?  // cents/yr
+  capRate              Decimal? @db.Decimal(6, 3)   // e.g. 6.250
+  dscr                 Decimal? @db.Decimal(6, 3)
+  cashOnCash           Decimal? @db.Decimal(6, 3)
+  equityRequired       BigInt?  // cents
+  pricePerUnit         BigInt?  // cents
+  // Projection (JSON array of 6 yr snapshots)
+  projection           Json?
+  // Scoring
+  bankabilityScore     Int      @default(0)
+  scoreBreakdown       Json?
+  // Relations
+  sourceId             String?
+  source               DealSource? @relation(fields: [sourceId], references: [id])
+  assignedToId         String?
+  assignedTo           User?    @relation("AssignedDeals", fields: [assignedToId], references: [id])
+  // Dedup
+  dedupeHash           String?  @unique
+  // Timestamps
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  notes        DealNote[]
+  attachments  DealAttachment[]
+  auditLogs    DealAuditLog[]
+
+  @@index([status])
+  @@index([state])
+  @@index([bankabilityScore])
+  @@index([assetType])
+  @@index([createdAt])
+  @@map("deals")
+}
+
+model DealNote {
+  id        String   @id @default(cuid())
+  dealId    String
+  userId    String
+  body      String   @db.Text
+  createdAt DateTime @default(now())
+
+  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("deal_notes")
+}
+
+model DealAttachment {
+  id        String   @id @default(cuid())
+  dealId    String
+  label     String   // "OM", "Rent Roll", "T12", "Inspection", "Appraisal", "Other"
+  url       String
+  fileName  String?
+  createdAt DateTime @default(now())
+
+  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@map("deal_attachments")
+}
+
+model DealAuditLog {
+  id        String         @id @default(cuid())
+  dealId    String
+  userId    String?
+  event     AuditEventType
+  payload   Json?
+  createdAt DateTime       @default(now())
+
+  deal Deal  @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([dealId])
+  @@map("deal_audit_logs")
+}
+
+// ─── CAPITAL ─────────────────────────────────────────────────────────────────
+
+model Loan {
+  id               String     @id @default(cuid())
+  dealId           String?    // linked deal (if originated from pipeline)
+  // Borrower/SPE
+  borrowerEntity   String     // "Borrower SPE LLC"
+  propertyAddress  String
+  // Loan terms
+  loanAmount       BigInt     // cents
+  interestRate     Decimal    @db.Decimal(6, 4)  // e.g. 5.9900
+  termYears        Int
+  amortYears       Int
+  originationDate  DateTime
+  maturityDate     DateTime
+  // Status
+  status           LoanStatus @default(ACTIVE)
+  // Snapshot
+  propertyValue    BigInt?    // cents at origination
+  ltv              Decimal?   @db.Decimal(5, 2)
+  dscr             Decimal?   @db.Decimal(6, 3)
+  monthlyPayment   BigInt     // cents
+  // Identifiers
+  loanNumber       String?    @unique
+  notes            String?    @db.Text
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  @@index([status])
+  @@map("loans")
+}
+
+// ─── SOURCES ─────────────────────────────────────────────────────────────────
+
+model DealSource {
+  id          String     @id @default(cuid())
+  name        String
+  type        SourceType @default(ON_MARKET)
+  url         String?
+  notes       String?
+  isActive    Boolean    @default(true)
+  schedule    String?    // cron placeholder
+  lastRunAt   DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  deals Deal[]
+
+  @@map("deal_sources")
+}
+
+// ─── IMPORT JOBS ─────────────────────────────────────────────────────────────
+
+model ImportJob {
+  id              String       @id @default(cuid())
+  userId          String
+  fileName        String?
+  sourceId        String?
+  status          ImportStatus @default(PENDING)
+  recordsTotal    Int          @default(0)
+  recordsCreated  Int          @default(0)
+  recordsUpdated  Int          @default(0)
+  recordsFailed   Int          @default(0)
+  errorLog        Json?
+  createdAt       DateTime     @default(now())
+  completedAt     DateTime?
+
+  @@map("import_jobs")
+}
+
+// ─── UNDERWRITING CONFIG ─────────────────────────────────────────────────────
+
+model UnderwritingConfig {
+  id              String   @id @default(cuid())
+  key             String   @unique
+  label           String
+  value           String   // stored as string, parsed by type
+  description     String?
+  updatedAt       DateTime @updatedAt
+
+  @@map("underwriting_configs")
+}
+
+model ScoringWeight {
+  id          String   @id @default(cuid())
+  factorKey   String   @unique
+  label       String
+  weight      Decimal  @db.Decimal(5, 3)  // e.g. 0.200
+  config      Json?
+  updatedAt   DateTime @updatedAt
+
+  @@map("scoring_weights")
+}
+
+// ─── ENUMS ───────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  ADMIN
+  ANALYST
+  VIEWER
+}
+
+enum AssetType {
+  SFR
+  MULTI_2_4
+  MULTI_5_PLUS
+  MULTI_20_30
+  MULTI_50_PLUS
+  MIXED_USE
+  OTHER
+}
+
+enum DealType {
+  ON_MARKET
+  OFF_MARKET
+  AUCTION
+  DISTRESSED
+  POCKET
+}
+
+enum DealStatus {
+  NEW
+  REVIEWING
+  UNDERWRITING
+  PASSED
+  LOI
+  UNDER_CONTRACT
+  CLOSED
+  DEAD
+}
+
+enum LoanStatus {
+  ACTIVE
+  PAID_OFF
+  DEFAULT
+  FORECLOSURE
+}
+
+enum SourceType {
+  ON_MARKET
+  OFF_MARKET
+  AUCTION
+  BROKER_EMAIL
+  DIRECT_MAIL
+  OTHER
+}
+
+enum AuditEventType {
+  CREATED
+  STATUS_CHANGED
+  UW_COMPUTED
+  NOTE_ADDED
+  ATTACHMENT_ADDED
+  FIELD_UPDATED
+  IMPORTED
+  AI_EXTRACTED
+  SCORE_UPDATED
+}
+
+enum ImportStatus {
+  PENDING
+  RUNNING
+  COMPLETE
+  FAILED
+}
