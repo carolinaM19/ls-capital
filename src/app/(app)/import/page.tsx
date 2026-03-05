@@ -7,7 +7,7 @@ export default async function ImportPage() {
     prisma.importJob.findMany({
       orderBy: { createdAt: 'desc' },
       take: 8,
-      include: { user: { select: { name: true, email: true } } },
+      
     }),
   ])
 
