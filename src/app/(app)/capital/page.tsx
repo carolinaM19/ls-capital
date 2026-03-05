@@ -97,7 +97,7 @@ export default async function CapitalPage() {
                     <td className="fin-num text-xs text-slate-300">{fmtDollarsFull(loan.loanAmount)}</td>
                     <td className="fin-num text-xs text-slate-400">{fmtPct(loan.interestRate?.toNumber())}</td>
                     <td className="fin-num text-xs text-slate-400">{fmtPct(loan.ltv?.toNumber())}</td>
-                    <td className="fin-num text-xs text-emerald-400">{fmtNum(loan.dscr)}</td>
+                    <td className="fin-num text-xs text-emerald-400">{fmtNum(loan.dscr?.toNumber())}</td>
                     <td className="text-xs text-slate-600">{fmtDate(loan.maturityDate)}</td>
                   </tr>
                 ))}
