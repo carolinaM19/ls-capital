@@ -1,138 +1,162 @@
 import { prisma } from '@/lib/prisma'
-import { fmtDollarsFull, fmtPct, fmtNum, fmtDate, STATUS_META } from '@/lib/utils'
+import { STATUS_META } from '@/lib/utils'
 import Link from 'next/link'
 
+function fmtD(n: number) {
+  return `$${n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+}
+
+function fmtK(cents: number) {
+  const dollars = cents / 100
+  if (dollars >= 1_000_000) return `$${(dollars / 1_000_000).toFixed(2)}M`
+  if (dollars >= 1_000) return `$${(dollars / 1_000).toFixed(0)}K`
+  return `$${dollars.toFixed(0)}`
+}
+
 export default async function CapitalPage() {
-  const [loans, pendingDeals] = await Promise.all([
-    prisma.loan.findMany({ orderBy: { originationDate: 'desc' } }),
-    prisma.deal.findMany({
-      where: { status: { in: ['LOI', 'UNDER_CONTRACT'] } },
-      include: { source: { select: { name: true } } },
-    }),
+  const [closedDeals, pendingDeals] = await Promise.all([
+    prisma.deal.findMany({ where: { status: 'CLOSED' } }),
+    prisma.deal.findMany({ where: { status: { in: ['LOI', 'UNDER_CONTRACT'] } } }),
   ])
 
-  const activeLoans = loans.filter(l => l.status === 'ACTIVE')
-  const PORTFOLIO_CAP = 10_000_000 * 100 // cents
+  // Real numbers from balance sheet (Jan 15, 2026)
+  const loanBalance = 417505.49
+  const interestRate = 0.0599
+  const monthlyInterest = (loanBalance * interestRate) / 12
+  const annualInterest = loanBalance * interestRate
 
-  const totalDeployed = activeLoans.reduce((s, l) => s + Number(l.loanAmount), 0)
-  const pendingCapital = pendingDeals.reduce((s, d) => s + (d.loanAmount ? Number(d.loanAmount) : 0), 0)
-  const remaining = PORTFOLIO_CAP - totalDeployed
-  const utilization = (totalDeployed / PORTFOLIO_CAP) * 100
+  const totalMonthlyDebt = closedDeals.reduce((s, d) => s + (d.monthlyPayment ? Number(d.monthlyPayment) : 0), 0)
+  const totalNOI = closedDeals.reduce((s, d) => s + (d.noi ? Number(d.noi) : 0), 0)
+  const annualNOI = totalNOI / 100
+  const dscr = totalMonthlyDebt > 0 ? (totalNOI / 12 / 100) / (totalMonthlyDebt / 100) : 0
 
-  const avgDSCR = activeLoans.length ? activeLoans.reduce((s, l) => s + Number(l.dscr ?? 0), 0) / activeLoans.length : 0
-  const avgLTV = activeLoans.length ? activeLoans.reduce((s, l) => s + Number(l.ltv ?? 0), 0) / activeLoans.length : 0
-  const avgRate = activeLoans.length ? activeLoans.reduce((s, l) => s + Number(l.interestRate), 0) / activeLoans.length : 0
+  const pendingCapital = pendingDeals.reduce((s, d) => s + (d.loanAmount ? Number(d.loanAmount) / 100 : 0), 0)
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      <div className="mb-8">
+    <div className="p-6 max-w-6xl mx-auto space-y-6">
+
+      <div>
         <h1 className="text-xl font-semibold text-slate-100 font-display">Capital Dashboard</h1>
-        <p className="text-xs text-slate-500 mt-0.5">LS Finance LLC · Portfolio Cap: $10,000,000</p>
+        <p className="text-xs text-slate-500 mt-0.5">LS Finance LLC · Lender to North Bay Road Capital LLC</p>
       </div>
 
-      {/* Capacity Bar */}
-      <div className="card p-6 mb-6">
-        <div className="flex items-end justify-between mb-4">
-          <div>
-            <div className="text-xs text-slate-500 uppercase tracking-widest mb-1">Deployed Capital</div>
-            <div className="text-3xl font-bold fin-num text-slate-100">{fmtDollarsFull(BigInt(totalDeployed))}</div>
-          </div>
-          <div className="text-right">
-            <div className="text-xs text-slate-500 uppercase tracking-widest mb-1">Available</div>
-            <div className="text-3xl font-bold fin-num text-emerald-400">{fmtDollarsFull(BigInt(remaining))}</div>
-          </div>
-        </div>
-        {/* Main bar */}
-        <div className="h-3 bg-white/[0.05] rounded-full overflow-hidden mb-1 relative">
-          <div className="capital-bar h-full rounded-full transition-all" style={{ width: `${utilization}%` }} />
-          {pendingCapital > 0 && remaining > 0 && (
-            <div className="absolute top-0 h-full bg-amber-400/30 rounded-r-full"
-              style={{ left: `${utilization}%`, width: `${Math.min(pendingCapital / PORTFOLIO_CAP * 100, 100 - utilization)}%` }}
-            />
-          )}
-        </div>
-        <div className="flex items-center justify-between text-xs text-slate-600 mt-1">
-          <span>{utilization.toFixed(1)}% deployed across {activeLoans.length} active loans</span>
-          {pendingCapital > 0 && <span className="text-amber-400/70">{fmtDollarsFull(BigInt(pendingCapital))} pending (LOI/Under Contract)</span>}
-        </div>
-      </div>
-
-      {/* Portfolio Metrics */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      {/* Top metrics */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: 'Active Loans', value: String(activeLoans.length), sub: 'in portfolio' },
-          { label: 'Avg DSCR', value: fmtNum(avgDSCR), sub: 'portfolio avg' },
-          { label: 'Avg LTV', value: fmtPct(avgLTV), sub: 'at origination' },
-          { label: 'Avg Rate', value: fmtPct(avgRate), sub: 'weighted' },
+          { label: 'Loan Balance', value: fmtD(loanBalance), sub: 'outstanding to NBRC', color: 'text-blue-400' },
+          { label: 'Annual Interest Income', value: fmtD(annualInterest), sub: 'at 5.99% fixed', color: 'text-emerald-400' },
+          { label: 'Monthly Interest', value: fmtD(monthlyInterest), sub: 'paid by NBRC', color: 'text-slate-100' },
+          { label: 'Portfolio DSCR', value: dscr.toFixed(2), sub: 'NOI ÷ debt service', color: dscr >= 1.2 ? 'text-emerald-400' : 'text-red-400' },
         ].map(m => (
           <div key={m.label} className="metric-card">
             <div className="metric-label">{m.label}</div>
-            <div className="metric-value text-slate-100 text-xl">{m.value}</div>
-            <div className="text-xs text-slate-600 mt-1">{m.sub}</div>
+            <div className={`metric-value ${m.color}`}>{m.value}</div>
+            <div className="text-xs text-slate-500 mt-1">{m.sub}</div>
           </div>
         ))}
       </div>
 
+      {/* Loan detail */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        {/* Active Loans */}
-        <div className="card lg:col-span-2">
-          <div className="px-5 py-4 border-b border-white/[0.05]">
-            <h2 className="text-sm font-semibold text-slate-300">Active Loan Portfolio</h2>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Loan #</th><th>Property</th><th>Amount</th><th>Rate</th><th>LTV</th><th>DSCR</th><th>Maturity</th>
-                </tr>
-              </thead>
-              <tbody>
-                {activeLoans.map(loan => (
-                  <tr key={loan.id} className="cursor-default">
-                    <td className="text-xs fin-num text-slate-500">{loan.loanNumber}</td>
-                    <td>
-                      <div className="text-xs text-slate-200 truncate max-w-32">{loan.propertyAddress.split(',')[0]}</div>
-                      <div className="text-xs text-slate-600">{loan.borrowerEntity}</div>
-                    </td>
-                    <td className="fin-num text-xs text-slate-300">{fmtDollarsFull(loan.loanAmount)}</td>
-                    <td className="fin-num text-xs text-slate-400">{fmtPct(loan.interestRate?.toNumber())}</td>
-                    <td className="fin-num text-xs text-slate-400">{fmtPct(loan.ltv?.toNumber())}</td>
-                    <td className="fin-num text-xs text-emerald-400">{fmtNum(loan.dscr?.toNumber())}</td>
-                    <td className="text-xs text-slate-600">{fmtDate(loan.maturityDate)}</td>
-                  </tr>
-                ))}
-                {activeLoans.length === 0 && (
-                  <tr><td colSpan={7} className="text-center py-8 text-slate-600">No active loans</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
 
-        {/* Pending pipeline */}
-        <div className="card">
-          <div className="px-5 py-4 border-b border-white/[0.05]">
-            <h2 className="text-sm font-semibold text-slate-300">Pending Capital</h2>
-            <p className="text-xs text-slate-600 mt-0.5">LOI & Under Contract</p>
+        <div className="lg:col-span-2 card p-5 space-y-5">
+          <h2 className="text-sm font-semibold text-slate-300">LS Finance → NBRC Loan</h2>
+
+          <div className="grid grid-cols-2 gap-4">
+            {[
+              { label: 'Lender', value: 'Luca Schnetzler (LS Finance LLC)' },
+              { label: 'Borrower', value: 'North Bay Road Capital LLC' },
+              { label: 'Interest Rate', value: '5.99% fixed' },
+              { label: 'Loan Term', value: '30 years' },
+              { label: 'LTV', value: '80% per property' },
+              { label: 'Prepayment', value: 'No penalty' },
+              { label: 'Collateral', value: '7 properties in Macon, GA' },
+              { label: 'Governing Law', value: 'Florida' },
+            ].map(item => (
+              <div key={item.label}>
+                <div className="text-xs text-slate-500">{item.label}</div>
+                <div className="text-sm text-slate-200 mt-0.5">{item.value}</div>
+              </div>
+            ))}
           </div>
-          {pendingDeals.length === 0 ? (
-            <div className="px-5 py-8 text-slate-600 text-sm">No pending deals</div>
-          ) : (
+
+          <div className="border-t border-white/[0.06] pt-4">
+            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3">Collateralized Properties</h3>
             <div className="divide-y divide-white/[0.04]">
-              {pendingDeals.map(d => (
-                <Link key={d.id} href={`/deals/${d.id}`} className="flex items-center gap-3 px-5 py-3 hover:bg-white/[0.02] transition-colors">
+              {closedDeals.map(deal => (
+                <Link key={deal.id} href={`/deals/${deal.id}`}
+                  className="flex items-center gap-4 py-2.5 hover:bg-white/[0.02] transition-colors -mx-2 px-2 rounded">
                   <div className="flex-1 min-w-0">
-                    <div className="text-xs text-slate-200 truncate">{d.address}</div>
-                    <div className="text-xs text-slate-600">{d.city}, {d.state}</div>
+                    <div className="text-sm text-slate-200 truncate">{deal.address}</div>
+                    <div className="text-xs text-slate-500">{deal.city}, {deal.state}</div>
                   </div>
-                  <div className="text-right">
-                    <div className="text-xs fin-num text-slate-300">{fmtDollarsFull(d.loanAmount ?? null)}</div>
-                    <span className={`badge text-[10px] ${STATUS_META[d.status]?.color}`}>{STATUS_META[d.status]?.label}</span>
+                  <div className="text-right flex-shrink-0">
+                    <div className="text-sm fin-num text-slate-300">{deal.loanAmount ? fmtK(Number(deal.loanAmount)) : '—'}</div>
+                    <div className="text-xs text-slate-500 fin-num">loan</div>
                   </div>
                 </Link>
               ))}
             </div>
-          )}
+          </div>
+        </div>
+
+        <div className="space-y-4">
+
+          {/* Interest schedule */}
+          <div className="card p-5">
+            <h3 className="text-sm font-semibold text-slate-300 mb-4">Income Schedule</h3>
+            <div className="space-y-3">
+              {[
+                { label: 'Monthly Interest', value: fmtD(monthlyInterest), color: 'text-emerald-400' },
+                { label: 'Quarterly Interest', value: fmtD(monthlyInterest * 3), color: 'text-slate-300' },
+                { label: 'Annual Interest', value: fmtD(annualInterest), color: 'text-slate-300' },
+              ].map(item => (
+                <div key={item.label} className="flex justify-between">
+                  <span className="text-xs text-slate-500">{item.label}</span>
+                  <span className={`text-sm fin-num font-medium ${item.color}`}>{item.value}</span>
+                </div>
+              ))}
+              <div className="border-t border-white/[0.06] pt-3">
+                <div className="flex justify-between">
+                  <span className="text-xs text-slate-500">Cash Flow Share (50%)</span>
+                  <span className="text-sm fin-num text-blue-400">{fmtD(annualNOI * 0.5)}/yr</span>
+                </div>
+                <div className="flex justify-between mt-2">
+                  <span className="text-xs text-slate-400 font-medium">Total Annual Return</span>
+                  <span className="text-sm fin-num text-blue-300 font-medium">{fmtD(annualInterest + annualNOI * 0.5)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Pending */}
+          <div className="card p-5">
+            <h3 className="text-sm font-semibold text-slate-300 mb-1">Pending Capital</h3>
+            <p className="text-xs text-slate-600 mb-3">LOI & Under Contract</p>
+            {pendingDeals.length === 0 ? (
+              <div className="text-sm text-slate-600">No pending deals</div>
+            ) : (
+              <div className="space-y-2">
+                {pendingDeals.map(d => (
+                  <Link key={d.id} href={`/deals/${d.id}`} className="flex items-center gap-3 hover:bg-white/[0.02] transition-colors rounded p-1 -mx-1">
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs text-slate-200 truncate">{d.address}</div>
+                      <div className="text-xs text-slate-600">{d.city}, {d.state}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-xs fin-num text-slate-300">{d.loanAmount ? fmtK(Number(d.loanAmount)) : '—'}</div>
+                      <span className={`badge text-[10px] ${STATUS_META[d.status]?.color}`}>{STATUS_META[d.status]?.label}</span>
+                    </div>
+                  </Link>
+                ))}
+                <div className="border-t border-white/[0.06] pt-2 flex justify-between">
+                  <span className="text-xs text-slate-500">Total Pending</span>
+                  <span className="text-xs fin-num text-amber-400">{fmtD(pendingCapital)}</span>
+                </div>
+              </div>
+            )}
+          </div>
+
         </div>
       </div>
     </div>
