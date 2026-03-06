@@ -31,7 +31,7 @@ export default async function DealDetailPage({ params }: { params: { id: string 
 
   return (
     <DealDetailClient
-      deal={JSON.parse(JSON.stringify(deal))}
+      deal={JSON.parse(JSON.stringify(deal, (_, v) => typeof v === 'bigint' ? v.toString() : v))}
       users={users}
       sources={sources}
     />
