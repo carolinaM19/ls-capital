@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-export async function POST(req: NextRequest) {
-  const body = await req.json()
-  const { city, state, assetTypes, minPrice, maxPrice, minUnits, maxUnits, minCapRate } = body
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url)
+  const city = searchParams.get('city') || ''
+  const state = searchParams.get('state') || ''
+  const minPrice = searchParams.get('minPrice') || ''
+  const maxPrice = searchParams.get('maxPrice') || ''
+  const minUnits = searchParams.get('minUnits') || ''
+  const maxUnits = searchParams.get('maxUnits') || ''
+  const minCapRate = searchParams.get('minCapRate') || ''
+  const assetTypes = searchParams.get('assetTypes')?.split(',') || ['MULTI_50_PLUS']
 
   const token = process.env.APIFY_TOKEN
   if (!token) return NextResponse.json({ error: 'No Apify token configured' }, { status: 500 })
@@ -16,9 +23,7 @@ export async function POST(req: NextRequest) {
     'MIXED_USE': 'Mixed Use',
   }
 
-  const crexiTypes = assetTypes?.length
-    ? [...new Set(assetTypes.map((t: string) => propertyTypeMap[t] || 'Multifamily'))]
-    : ['Multifamily']
+  const crexiTypes = [...new Set(assetTypes.map((t: string) => propertyTypeMap[t] || 'Multifamily'))]
 
   const params = new URLSearchParams()
   if (city) params.set('location', `${city}${state ? `, ${state}` : ''}`)
@@ -38,21 +43,31 @@ export async function POST(req: NextRequest) {
       }
     )
 
+    const rawText = await apifyRes.text()
     if (!apifyRes.ok) {
-      const err = await apifyRes.text()
-      return NextResponse.json({ error: `Apify error: ${err}` }, { status: 500 })
+      return NextResponse.json({ error: `Apify error: ${rawText}` }, { status: 500 })
     }
 
-    const rawResults = await apifyRes.json()
+    let rawResults: any[]
+    try {
+      rawResults = JSON.parse(rawText)
+    } catch {
+      return NextResponse.json({ error: `Invalid Apify response: ${rawText.slice(0, 200)}` }, { status: 500 })
+    }
+
+    if (!Array.isArray(rawResults)) {
+      return NextResponse.json({ error: 'Unexpected Apify response format', raw: rawResults }, { status: 500 })
+    }
+
     const INTEREST_RATE = 0.0599
     const LTV = 0.80
 
     const results = rawResults.map((item: any) => {
-      const price = parseFloat((item.price || '').replace(/[$,]/g, '') || '0')
+      const price = parseFloat((item.price || '').toString().replace(/[$,]/g, '') || '0')
       const units = parseInt(item.units || item.numberOfUnits || '1')
-      const sqft = parseInt((item.squareFootage || '').replace(/[,]/g, '') || '0')
-      const listedNOI = parseFloat((item.noi || '').replace(/[$,]/g, '') || '0')
-      const listedCapRate = parseFloat((item.capRate || '').replace(/%/g, '') || '0')
+      const sqft = parseInt((item.squareFootage || '').toString().replace(/[,]/g, '') || '0')
+      const listedNOI = parseFloat((item.noi || '').toString().replace(/[$,]/g, '') || '0')
+      const listedCapRate = parseFloat((item.capRate || '').toString().replace(/%/g, '') || '0')
 
       if (!price) return null
       if (minUnits && units < parseInt(minUnits)) return null
