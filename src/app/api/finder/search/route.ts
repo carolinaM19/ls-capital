@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
   if (city) params.set('location', `${city}${state ? `, ${state}` : ''}`)
   if (minPrice) params.set('listingMinPrice', String(minPrice))
   if (maxPrice) params.set('listingMaxPrice', String(maxPrice))
-  crexiTypes.forEach((t: string) => params.append('propertyTypes[]', t))
+  crexiTypes.forEach((t: any) => params.append('propertyTypes[]', t))
 
   const crexiSearchUrl = `https://www.crexi.com/properties?${params.toString()}`
 
