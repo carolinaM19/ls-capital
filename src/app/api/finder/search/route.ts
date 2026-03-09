@@ -6,7 +6,6 @@ export async function GET(req: NextRequest) {
   const state = searchParams.get('state') || ''
   const minPrice = searchParams.get('minPrice') || ''
   const maxPrice = searchParams.get('maxPrice') || ''
-  const minUnits = searchParams.get('minUnits') || '2'
 
   try {
     const params = new URLSearchParams({
@@ -43,57 +42,7 @@ export async function GET(req: NextRequest) {
       const price = item.list_price || item.price || 0
       const units = item.description?.beds || item.units || 2
       const sqft = item.description?.sqft || 0
-      const address = item.location?.address?.line || item.address?.line || 'Unknown'
-      const itemCity = item.location?.address?.city || city
-      const itemState = item.location?.address?.state_code || state
-      const listingId = item.property_id || item
-cd ~/Downloads/ls-capital && cat > src/app/api/finder/search/route.ts << 'ENDFILE'
-import { NextRequest, NextResponse } from 'next/server'
-
-export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url)
-  const city = searchParams.get('city') || ''
-  const state = searchParams.get('state') || ''
-  const minPrice = searchParams.get('minPrice') || ''
-  const maxPrice = searchParams.get('maxPrice') || ''
-  const minUnits = searchParams.get('minUnits') || '2'
-
-  try {
-    const params = new URLSearchParams({
-      city,
-      state_code: state,
-      property_type: 'multi_family',
-      listing_status: 'for_sale',
-      limit: '30',
-      offset: '0',
-      sort: 'newest',
-      ...(minPrice && { price_min: minPrice }),
-      ...(maxPrice && { price_max: maxPrice }),
-    })
-
-    const res = await fetch(`https://us-real-estate.p.rapidapi.com/v2/for-sale?${params}`, {
-      headers: {
-        'x-rapidapi-key': process.env.RAPIDAPI_KEY || '',
-        'x-rapidapi-host': 'us-real-estate.p.rapidapi.com',
-      },
-    })
-
-    if (!res.ok) {
-      const txt = await res.text()
-      return NextResponse.json({ error: `API error ${res.status}: ${txt.slice(0, 200)}` }, { status: 500 })
-    }
-
-    const data = await res.json()
-    const listings = data?.data?.home_search?.results || data?.results || []
-
-    const INTEREST_RATE = 0.0599
-    const LTV = 0.80
-
-    const results = listings.map((item: any) => {
-      const price = item.list_price || item.price || 0
-      const units = item.description?.beds || item.units || 2
-      const sqft = item.description?.sqft || 0
-      const address = item.location?.address?.line || item.address?.line || 'Unknown'
+      const address = item.location?.address?.line || 'Unknown'
       const itemCity = item.location?.address?.city || city
       const itemState = item.location?.address?.state_code || state
       const listingId = item.property_id || item.listing_id || String(Math.random())
