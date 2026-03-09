@@ -6,96 +6,118 @@ export async function GET(req: NextRequest) {
   const state = searchParams.get('state') || ''
   const minPrice = searchParams.get('minPrice') || ''
   const maxPrice = searchParams.get('maxPrice') || ''
-  const minUnits = searchParams.get('minUnits') || ''
-  const maxUnits = searchParams.get('maxUnits') || ''
-  const minCapRate = searchParams.get('minCapRate') || ''
-  const assetTypes = searchParams.get('assetTypes')?.split(',') || ['MULTI_50_PLUS']
-
-  const propertyTypeMap: Record<string, string> = {
-    'SFR': 'Single Family',
-    'MULTI_2_4': 'Multifamily',
-    'MULTI_5_PLUS': 'Multifamily',
-    'MULTI_20_30': 'Multifamily',
-    'MULTI_50_PLUS': 'Multifamily',
-    'MIXED_USE': 'Mixed Use',
-  }
-
-  const crexiTypes = [...new Set(assetTypes.map((t: string) => propertyTypeMap[t] || 'Multifamily'))]
+  const minUnits = searchParams.get('minUnits') || '2'
 
   try {
-    const filters: any = {
-      propertyTypes: crexiTypes,
-      listingTypes: ['sale'],
-    }
-    if (city || state) filters.location = `${city}${city && state ? ', ' : ''}${state}`
-    if (minPrice) filters.minPrice = parseInt(minPrice)
-    if (maxPrice) filters.maxPrice = parseInt(maxPrice)
-    if (minUnits) filters.minUnits = parseInt(minUnits)
-    if (maxUnits) filters.maxUnits = parseInt(maxUnits)
-
-    const crexiRes = await fetch('https://api.crexi.com/assets/search', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Origin': 'https://www.crexi.com',
-        'Referer': 'https://www.crexi.com/',
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      },
-      body: JSON.stringify({
-        filters,
-        page: 1,
-        pageSize: 30,
-        sortBy: 'listedAt',
-        sortOrder: 'desc',
-      }),
+    const params = new URLSearchParams({
+      city,
+      state_code: state,
+      property_type: 'multi_family',
+      listing_status: 'for_sale',
+      limit: '30',
+      offset: '0',
+      sort: 'newest',
+      ...(minPrice && { price_min: minPrice }),
+      ...(maxPrice && { price_max: maxPrice }),
     })
 
-    if (!crexiRes.ok) {
-      const errText = await crexiRes.text()
-      return NextResponse.json({ error: `Crexi API error ${crexiRes.status}: ${errText.slice(0, 200)}` }, { status: 500 })
+    const res = await fetch(`https://us-real-estate.p.rapidapi.com/v2/for-sale?${params}`, {
+      headers: {
+        'x-rapidapi-key': process.env.RAPIDAPI_KEY || '',
+        'x-rapidapi-host': 'us-real-estate.p.rapidapi.com',
+      },
+    })
+
+    if (!res.ok) {
+      const txt = await res.text()
+      return NextResponse.json({ error: `API error ${res.status}: ${txt.slice(0, 200)}` }, { status: 500 })
     }
 
-    const crexiData = await crexiRes.json()
-    const listings = crexiData.results || crexiData.assets || crexiData.data || crexiData || []
-
-    if (!Array.isArray(listings)) {
-      return NextResponse.json({ error: 'Unexpected Crexi response', raw: JSON.stringify(crexiData).slice(0, 300) }, { status: 500 })
-    }
+    const data = await res.json()
+    const listings = data?.data?.home_search?.results || data?.results || []
 
     const INTEREST_RATE = 0.0599
     const LTV = 0.80
 
     const results = listings.map((item: any) => {
-      const price = item.askingPrice || item.price || item.listPrice || 0
-      const units = item.units || item.numberOfUnits || item.unitCount || 1
-      const sqft = item.squareFeet || item.sqFt || item.buildingSize || 0
-      const listedCapRate = item.capRate || item.capitalizationRate || 0
-      const listedNOI = item.noi || item.netOperatingIncome || 0
+      const price = item.list_price || item.price || 0
+      const units = item.description?.beds || item.units || 2
+      const sqft = item.description?.sqft || 0
+      const address = item.location?.address?.line || item.address?.line || 'Unknown'
+      const itemCity = item.location?.address?.city || city
+      const itemState = item.location?.address?.state_code || state
+      const listingId = item.property_id || item
+cd ~/Downloads/ls-capital && cat > src/app/api/finder/search/route.ts << 'ENDFILE'
+import { NextRequest, NextResponse } from 'next/server'
+
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url)
+  const city = searchParams.get('city') || ''
+  const state = searchParams.get('state') || ''
+  const minPrice = searchParams.get('minPrice') || ''
+  const maxPrice = searchParams.get('maxPrice') || ''
+  const minUnits = searchParams.get('minUnits') || '2'
+
+  try {
+    const params = new URLSearchParams({
+      city,
+      state_code: state,
+      property_type: 'multi_family',
+      listing_status: 'for_sale',
+      limit: '30',
+      offset: '0',
+      sort: 'newest',
+      ...(minPrice && { price_min: minPrice }),
+      ...(maxPrice && { price_max: maxPrice }),
+    })
+
+    const res = await fetch(`https://us-real-estate.p.rapidapi.com/v2/for-sale?${params}`, {
+      headers: {
+        'x-rapidapi-key': process.env.RAPIDAPI_KEY || '',
+        'x-rapidapi-host': 'us-real-estate.p.rapidapi.com',
+      },
+    })
+
+    if (!res.ok) {
+      const txt = await res.text()
+      return NextResponse.json({ error: `API error ${res.status}: ${txt.slice(0, 200)}` }, { status: 500 })
+    }
+
+    const data = await res.json()
+    const listings = data?.data?.home_search?.results || data?.results || []
+
+    const INTEREST_RATE = 0.0599
+    const LTV = 0.80
+
+    const results = listings.map((item: any) => {
+      const price = item.list_price || item.price || 0
+      const units = item.description?.beds || item.units || 2
+      const sqft = item.description?.sqft || 0
+      const address = item.location?.address?.line || item.address?.line || 'Unknown'
+      const itemCity = item.location?.address?.city || city
+      const itemState = item.location?.address?.state_code || state
+      const listingId = item.property_id || item.listing_id || String(Math.random())
+      const image = item.primary_photo?.href || item.photos?.[0]?.href
 
       if (!price) return null
-      if (minUnits && units < parseInt(minUnits)) return null
-      if (maxUnits && units > parseInt(maxUnits)) return null
 
+      const capRate = item.cap_rate || 7.0
+      const noi = price * capRate / 100
       const loanAmount = price * LTV
       const downPayment = price * (1 - LTV)
       const monthlyRate = INTEREST_RATE / 12
       const n = 360
       const monthlyPayment = loanAmount * (monthlyRate * Math.pow(1 + monthlyRate, n)) / (Math.pow(1 + monthlyRate, n) - 1)
-      const estimatedCapRate = listedCapRate || 7.0
-      const estimatedNOI = listedNOI || (price * estimatedCapRate / 100)
       const annualDebtService = monthlyPayment * 12
-      const annualCashFlow = estimatedNOI - annualDebtService
+      const annualCashFlow = noi - annualDebtService
       const cashOnCash = downPayment > 0 ? (annualCashFlow / downPayment) * 100 : 0
-      const dscr = annualDebtService > 0 ? estimatedNOI / annualDebtService : 0
+      const dscr = annualDebtService > 0 ? noi / annualDebtService : 0
       const pricePerUnit = units > 0 ? price / units : 0
 
-      if (minCapRate && estimatedCapRate < parseFloat(minCapRate)) return null
-
       let score = 0
-      if (estimatedCapRate >= 8) score += 30
-      else if (estimatedCapRate >= 6) score += 20
-      else if (estimatedCapRate >= 5) score += 10
+      if (capRate >= 8) score += 30
+      else if (capRate >= 6) score += 20
+      else if (capRate >= 5) score += 10
       if (cashOnCash >= 15) score += 25
       else if (cashOnCash >= 10) score += 15
       else if (cashOnCash >= 5) score += 8
@@ -104,30 +126,22 @@ export async function GET(req: NextRequest) {
       if (units >= 10) score += 15
       else if (units >= 5) score += 10
       else if (units >= 2) score += 5
-      if (pricePerUnit > 0 && pricePerUnit <= 80000) score += 10
+      if (pricePerUnit <= 80000) score += 10
       else if (pricePerUnit <= 120000) score += 5
 
-      const addressParts = [item.address, item.streetAddress, item.street].filter(Boolean)
-      const address = addressParts[0] || item.name || item.title || 'Unknown address'
-      const itemCity = item.city || city
-      const itemState = item.state || item.stateCode || state
-
       return {
-        id: item.id || item.assetId || String(Math.random()),
-        address,
-        city: itemCity,
-        state: itemState,
+        id: listingId,
+        address, city: itemCity, state: itemState,
         price, units, sqft,
-        assetType: item.propertyType || item.assetType || 'Multifamily',
-        capRate: estimatedCapRate,
-        noi: estimatedNOI,
-        loanAmount, downPayment, monthlyPayment, annualCashFlow, cashOnCash, dscr, pricePerUnit,
+        assetType: 'Multifamily',
+        capRate, noi, loanAmount, downPayment,
+        monthlyPayment, annualCashFlow, cashOnCash, dscr, pricePerUnit,
         score: Math.min(score, 100),
-        url: item.url || item.listingUrl || (item.id ? `https://www.crexi.com/properties/${item.id}` : null),
-        image: item.thumbnailUrl || item.imageUrl || item.primaryImage,
-        broker: item.brokerName || item.listingAgent || item.contactName,
-        daysOnMarket: item.daysOnMarket || item.daysListed,
-        source: 'Crexi',
+        url: item.href || `https://www.realtor.com/realestateandhomes-detail/${listingId}`,
+        image,
+        broker: item.advertisers?.[0]?.name || item.list_agent?.name,
+        daysOnMarket: item.list_date,
+        source: 'Realtor.com',
       }
     }).filter(Boolean).sort((a: any, b: any) => b.score - a.score)
 
