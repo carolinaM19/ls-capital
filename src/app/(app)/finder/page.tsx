@@ -3,15 +3,80 @@
 import { useState } from 'react'
 
 function fmtK(n: number) {
-  if (!n) return '\u2014'
+  if (!n) return '—'
   if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`
   if (n >= 1_000) return `$${(n / 1_000).toFixed(0)}K`
   return `$${n.toFixed(0)}`
 }
 
 function fmtPct(n: number) {
-  if (!n) return '\u2014'
+  if (!n) return '—'
   return `${n.toFixed(1)}%`
+}
+
+const STATES: Record<string, string[]> = {
+  AL: ['Birmingham','Montgomery','Huntsville','Mobile','Tuscaloosa'],
+  AK: ['Anchorage','Fairbanks','Juneau'],
+  AZ: ['Phoenix','Tucson','Mesa','Chandler','Scottsdale','Tempe','Gilbert'],
+  AR: ['Little Rock','Fort Smith','Fayetteville','Springdale','Jonesboro'],
+  CA: ['Los Angeles','San Diego','San Jose','San Francisco','Fresno','Sacramento','Oakland'],
+  CO: ['Denver','Colorado Springs','Aurora','Fort Collins','Lakewood','Boulder'],
+  CT: ['Bridgeport','New Haven','Hartford','Stamford','Waterbury'],
+  DE: ['Wilmington','Dover','Newark'],
+  FL: ['Jacksonville','Miami','Tampa','Orlando','St. Petersburg','Hialeah','Tallahassee','Fort Lauderdale'],
+  GA: ['Atlanta','Augusta','Columbus','Macon','Savannah','Athens','Sandy Springs','Roswell'],
+  HI: ['Honolulu','Pearl City','Hilo','Kailua'],
+  ID: ['Boise','Meridian','Nampa','Idaho Falls'],
+  IL: ['Chicago','Aurora','Rockford','Joliet','Naperville','Springfield','Peoria'],
+  IN: ['Indianapolis','Fort Wayne','Evansville','South Bend','Carmel'],
+  IA: ['Des Moines','Cedar Rapids','Davenport','Sioux City'],
+  KS: ['Wichita','Overland Park','Kansas City','Topeka'],
+  KY: ['Louisville','Lexington','Bowling Green','Owensboro'],
+  LA: ['New Orleans','Baton Rouge','Shreveport','Lafayette','Lake Charles'],
+  ME: ['Portland','Lewiston','Bangor'],
+  MD: ['Baltimore','Frederick','Rockville','Gaithersburg','Annapolis'],
+  MA: ['Boston','Worcester','Springfield','Cambridge','Lowell'],
+  MI: ['Detroit','Grand Rapids','Warren','Sterling Heights','Lansing','Ann Arbor'],
+  MN: ['Minneapolis','Saint Paul','Rochester','Duluth','Bloomington'],
+  MS: ['Jackson','Gulfport','Southaven','Hattiesburg','Biloxi'],
+  MO: ['Kansas City','St. Louis','Springfield','Columbia','Independence'],
+  MT: ['Billings','Missoula','Great Falls','Bozeman'],
+  NE: ['Omaha','Lincoln','Bellevue','Grand Island'],
+  NV: ['Las Vegas','Henderson','Reno','North Las Vegas','Sparks'],
+  NH: ['Manchester','Nashua','Concord'],
+  NJ: ['Newark','Jersey City','Paterson','Elizabeth','Trenton'],
+  NM: ['Albuquerque','Las Cruces','Rio Rancho','Santa Fe'],
+  NY: ['New York','Buffalo','Rochester','Yonkers','Syracuse','Albany'],
+  NC: ['Charlotte','Raleigh','Greensboro','Durham','Winston-Salem','Fayetteville','Cary'],
+  ND: ['Fargo','Bismarck','Grand Forks','Minot'],
+  OH: ['Columbus','Cleveland','Cincinnati','Toledo','Akron','Dayton'],
+  OK: ['Oklahoma City','Tulsa','Norman','Broken Arrow','Lawton'],
+  OR: ['Portland','Salem','Eugene','Gresham','Hillsboro'],
+  PA: ['Philadelphia','Pittsburgh','Allentown','Erie','Reading'],
+  RI: ['Providence','Cranston','Warwick','Pawtucket'],
+  SC: ['Columbia','Charleston','North Charleston','Mount Pleasant','Rock Hill','Greenville'],
+  SD: ['Sioux Falls','Rapid City','Aberdeen'],
+  TN: ['Nashville','Memphis','Knoxville','Chattanooga','Clarksville','Murfreesboro'],
+  TX: ['Houston','San Antonio','Dallas','Austin','Fort Worth','El Paso','Arlington','Corpus Christi','Plano','Laredo'],
+  UT: ['Salt Lake City','West Valley City','Provo','West Jordan','Orem'],
+  VT: ['Burlington','South Burlington','Rutland'],
+  VA: ['Virginia Beach','Norfolk','Chesapeake','Richmond','Newport News','Alexandria'],
+  WA: ['Seattle','Spokane','Tacoma','Vancouver','Bellevue','Kirkland'],
+  WV: ['Charleston','Huntington','Morgantown','Parkersburg'],
+  WI: ['Milwaukee','Madison','Green Bay','Kenosha','Racine'],
+  WY: ['Cheyenne','Casper','Laramie'],
+}
+
+const STATE_NAMES: Record<string, string> = {
+  AL:'Alabama',AK:'Alaska',AZ:'Arizona',AR:'Arkansas',CA:'California',CO:'Colorado',
+  CT:'Connecticut',DE:'Delaware',FL:'Florida',GA:'Georgia',HI:'Hawaii',ID:'Idaho',
+  IL:'Illinois',IN:'Indiana',IA:'Iowa',KS:'Kansas',KY:'Kentucky',LA:'Louisiana',
+  ME:'Maine',MD:'Maryland',MA:'Massachusetts',MI:'Michigan',MN:'Minnesota',MS:'Mississippi',
+  MO:'Missouri',MT:'Montana',NE:'Nebraska',NV:'Nevada',NH:'New Hampshire',NJ:'New Jersey',
+  NM:'New Mexico',NY:'New York',NC:'North Carolina',ND:'North Dakota',OH:'Ohio',
+  OK:'Oklahoma',OR:'Oregon',PA:'Pennsylvania',RI:'Rhode Island',SC:'South Carolina',
+  SD:'South Dakota',TN:'Tennessee',TX:'Texas',UT:'Utah',VT:'Vermont',VA:'Virginia',
+  WA:'Washington',WV:'West Virginia',WI:'Wisconsin',WY:'Wyoming',
 }
 
 const ASSET_OPTIONS = [
@@ -23,8 +88,8 @@ const ASSET_OPTIONS = [
 ]
 
 export default function FinderPage() {
-  const [city, setCity] = useState('')
-  const [state, setState] = useState('')
+  const [selectedState, setSelectedState] = useState('')
+  const [selectedCity, setSelectedCity] = useState('')
   const [minPrice, setMinPrice] = useState('')
   const [maxPrice, setMaxPrice] = useState('')
   const [minUnits, setMinUnits] = useState('')
@@ -38,8 +103,15 @@ export default function FinderPage() {
   const [addingId, setAddingId] = useState<string | null>(null)
   const [addedIds, setAddedIds] = useState<Set<string>>(new Set())
 
+  const cities = selectedState ? STATES[selectedState] || [] : []
+
   const toggleAsset = (val: string) => {
     setAssetTypes(prev => prev.includes(val) ? prev.filter(v => v !== val) : [...prev, val])
+  }
+
+  const handleStateChange = (s: string) => {
+    setSelectedState(s)
+    setSelectedCity('')
   }
 
   const handleSearch = async () => {
@@ -48,8 +120,8 @@ export default function FinderPage() {
     setSearched(true)
     try {
       const params = new URLSearchParams()
-      if (city) params.set('city', city)
-      if (state) params.set('state', state)
+      if (selectedCity) params.set('city', selectedCity)
+      if (selectedState) params.set('state', selectedState)
       if (minPrice) params.set('minPrice', minPrice)
       if (maxPrice) params.set('maxPrice', maxPrice)
       if (minUnits) params.set('minUnits', minUnits)
@@ -84,30 +156,60 @@ export default function FinderPage() {
     }
   }
 
+  const inputClass = "w-full bg-white/[0.05] border border-white/[0.08] rounded px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-blue-500/50"
+  const selectClass = "w-full bg-[#1a1f2e] border border-white/[0.08] rounded px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-blue-500/50 cursor-pointer"
+
   return (
     <div className="p-6 max-w-6xl mx-auto">
       <div className="mb-6">
         <h1 className="text-xl font-semibold text-slate-100 font-display">Deal Finder</h1>
         <p className="text-xs text-slate-500 mt-0.5">Search Crexi for deals matching NBRC criteria</p>
       </div>
+
       <div className="card p-5 mb-6">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-          {[
-            { label: 'City', val: city, set: setCity, ph: 'e.g. Cleveland' },
-            { label: 'State', val: state, set: setState, ph: 'e.g. OH' },
-            { label: 'Min Price', val: minPrice, set: setMinPrice, ph: 'e.g. 500000' },
-            { label: 'Max Price', val: maxPrice, set: setMaxPrice, ph: 'e.g. 5000000' },
-            { label: 'Min Units', val: minUnits, set: setMinUnits, ph: 'e.g. 20' },
-            { label: 'Max Units', val: maxUnits, set: setMaxUnits, ph: 'e.g. 200' },
-            { label: 'Min Cap Rate %', val: minCapRate, set: setMinCapRate, ph: 'e.g. 8' },
-          ].map(f => (
-            <div key={f.label}>
-              <label className="text-xs text-slate-500 uppercase tracking-widest mb-1 block">{f.label}</label>
-              <input value={f.val} onChange={e => f.set(e.target.value)} placeholder={f.ph}
-                className="w-full bg-white/[0.05] border border-white/[0.08] rounded px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-blue-500/50" />
-            </div>
-          ))}
+        {/* Location Row */}
+        <div className="grid grid-cols-2 gap-4 mb-4">
+          <div>
+            <label className="text-xs text-slate-500 uppercase tracking-widest mb-1 block">State</label>
+            <select value={selectedState} onChange={e => handleStateChange(e.target.value)} className={selectClass}>
+              <option value="">All States</option>
+              {Object.entries(STATE_NAMES).sort((a,b) => a[1].localeCompare(b[1])).map(([code, name]) => (
+                <option key={code} value={code}>{name}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs text-slate-500 uppercase tracking-widest mb-1 block">City</label>
+            <select value={selectedCity} onChange={e => setSelectedCity(e.target.value)} className={selectClass} disabled={!selectedState}>
+              <option value="">All Cities</option>
+              {cities.map(c => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
         </div>
+
+        {/* Filters Row */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+          <div>
+            <label className="text-xs text-slate-500 uppercase tracking-widest mb-1 block">Min Price</label>
+            <input value={minPrice} onChange={e => setMinPrice(e.target.value)} placeholder="e.g. 500000" className={inputClass} />
+          </div>
+          <div>
+            <label className="text-xs text-slate-500 uppercase tracking-widest mb-1 block">Max Price</label>
+            <input value={maxPrice} onChange={e => setMaxPrice(e.target.value)} placeholder="e.g. 5000000" className={inputClass} />
+          </div>
+          <div>
+            <label className="text-xs text-slate-500 uppercase tracking-widest mb-1 block">Min Units</label>
+            <input value={minUnits} onChange={e => setMinUnits(e.target.value)} placeholder="e.g. 20" className={inputClass} />
+          </div>
+          <div>
+            <label className="text-xs text-slate-500 uppercase tracking-widest mb-1 block">Min Cap Rate %</label>
+            <input value={minCapRate} onChange={e => setMinCapRate(e.target.value)} placeholder="e.g. 8" className={inputClass} />
+          </div>
+        </div>
+
+        {/* Asset Types */}
         <div className="mb-4">
           <label className="text-xs text-slate-500 uppercase tracking-widest mb-2 block">Asset Types</label>
           <div className="flex flex-wrap gap-2">
@@ -119,17 +221,21 @@ export default function FinderPage() {
             ))}
           </div>
         </div>
+
         <button onClick={handleSearch} disabled={loading} className="btn-primary px-6 py-2 text-sm">
           {loading ? 'Searching Crexi...' : 'Search Deals'}
         </button>
       </div>
+
       {error && <div className="card p-4 mb-4 text-red-400 text-sm">{error}</div>}
+
       {searched && !loading && results.length === 0 && !error && (
-        <div className="card p-8 text-center text-slate-500 text-sm">No deals found.</div>
+        <div className="card p-8 text-center text-slate-500 text-sm">No deals found matching your criteria.</div>
       )}
+
       {results.length > 0 && (
         <div>
-          <div className="text-xs text-slate-500 mb-3">{results.length} deals found</div>
+          <div className="text-xs text-slate-500 mb-3">{results.length} deals found, sorted by score</div>
           <div className="space-y-3">
             {results.map((r: any) => (
               <div key={r.id} className="card p-4">
@@ -139,7 +245,7 @@ export default function FinderPage() {
                     <div className="flex items-start justify-between gap-2 mb-2">
                       <div>
                         <div className="text-sm font-medium text-slate-200">{r.address}</div>
-                        <div className="text-xs text-slate-500">{r.city}, {r.state} · {r.units} units</div>
+                        <div className="text-xs text-slate-500">{r.city}, {r.state} · {r.units} units · {r.assetType}</div>
                       </div>
                       <div className="text-right">
                         <div className="text-sm font-bold text-slate-100 fin-num">{fmtK(r.price)}</div>
@@ -149,15 +255,16 @@ export default function FinderPage() {
                     <div className="grid grid-cols-4 gap-3 mb-3">
                       <div><div className="text-xs text-slate-500">Cap Rate</div><div className="text-sm fin-num text-emerald-400">{fmtPct(r.capRate)}</div></div>
                       <div><div className="text-xs text-slate-500">CoC</div><div className="text-sm fin-num text-blue-400">{fmtPct(r.cashOnCash)}</div></div>
-                      <div><div className="text-xs text-slate-500">DSCR</div><div className="text-sm fin-num text-slate-300">{r.dscr ? r.dscr.toFixed(2) : '\u2014'}</div></div>
+                      <div><div className="text-xs text-slate-500">DSCR</div><div className="text-sm fin-num text-slate-300">{r.dscr ? r.dscr.toFixed(2) : '—'}</div></div>
                       <div><div className="text-xs text-slate-500">Down</div><div className="text-sm fin-num text-slate-300">{fmtK(r.downPayment)}</div></div>
                     </div>
                     <div className="flex items-center gap-3">
                       <span className="text-xs bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded">Score: {r.score}</span>
                       {r.url && <a href={r.url} target="_blank" rel="noopener noreferrer" className="text-xs text-slate-400 hover:text-slate-200 underline">View on Crexi</a>}
+                      {r.broker && <span className="text-xs text-slate-600">{r.broker}</span>}
                       <div className="flex-1" />
                       {addedIds.has(r.id) ? (
-                        <span className="text-xs text-emerald-400">Added!</span>
+                        <span className="text-xs text-emerald-400">Added to Pipeline</span>
                       ) : (
                         <button onClick={() => handleAdd(r)} disabled={addingId === r.id} className="btn-primary text-xs py-1.5 px-4">
                           {addingId === r.id ? 'Adding...' : '+ Add to Pipeline'}
