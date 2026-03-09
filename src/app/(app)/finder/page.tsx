@@ -87,6 +87,141 @@ const ASSET_OPTIONS = [
   { value: 'MULTI_50_PLUS', label: '50+ Units' },
 ]
 
+function LOIModal({ deal, onClose }: { deal: any; onClose: () => void }) {
+  const [loi, setLoi] = useState('')
+  const [offerPrice, setOfferPrice] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const [copied, setCopied] = useState(false)
+  const [brokerEmail, setBrokerEmail] = useState('')
+  const [sending, setSending] = useState(false)
+  const [sent, setSent] = useState(false)
+  const [emailError, setEmailError] = useState('')
+
+  const generate = async () => {
+    setLoading(true)
+    try {
+      const res = await fetch('/api/loi', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deal }),
+      })
+      const data = await res.json()
+      setLoi(data.loi)
+      setOfferPrice(data.offerPrice)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useState(() => { generate() })
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(loi)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  const handleDownload = () => {
+    const blob = new Blob([loi], { type: 'text/plain' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `LOI_${deal.address.replace(/[^a-zA-Z0-9]/g, '_')}.txt`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const handleSend = async () => {
+    if (!brokerEmail) return
+    setSending(true)
+    setEmailError('')
+    try {
+      const res = await fetch('/api/loi', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deal, sendEmail: true, brokerEmail }),
+      })
+      const data = await res.json()
+      if (data.sent) {
+        setSent(true)
+      } else {
+        setEmailError(data.emailError || 'Failed to send email')
+      }
+    } catch (e: any) {
+      setEmailError(e.message)
+    } finally {
+      setSending(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+      <div className="bg-[#0f1117] border border-white/[0.08] rounded-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between p-4 border-b border-white/[0.08]">
+          <div>
+            <h2 className="text-sm font-semibold text-slate-100">Letter of Intent</h2>
+            <p className="text-xs text-slate-500">{deal.address}, {deal.city}, {deal.state}</p>
+          </div>
+          <button onClick={onClose} className="text-slate-500 hover:text-slate-300 text-xl leading-none">&times;</button>
+        </div>
+
+        {loading ? (
+          <div className="flex-1 flex items-center justify-center p-8">
+            <div className="text-slate-500 text-sm">Generating LOI...</div>
+          </div>
+        ) : (
+          <>
+            <div className="p-3 bg-emerald-500/10 border-b border-emerald-500/20 flex items-center gap-2">
+              <span className="text-xs text-emerald-400">Offer Price:</span>
+              <span className="text-sm font-bold text-emerald-400 fin-num">${offerPrice.toLocaleString()}</span>
+              <span className="text-xs text-slate-500">(10% below asking ${deal.price.toLocaleString()})</span>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4">
+              <pre className="text-xs text-slate-300 whitespace-pre-wrap font-mono leading-relaxed">{loi}</pre>
+            </div>
+
+            {/* Email send section */}
+            <div className="p-4 border-t border-white/[0.08] space-y-3">
+              {sent ? (
+                <div className="text-center py-2 text-emerald-400 text-sm font-medium">✓ LOI sent successfully!</div>
+              ) : (
+                <div className="flex gap-2">
+                  <input
+                    type="email"
+                    value={brokerEmail}
+                    onChange={e => setBrokerEmail(e.target.value)}
+                    placeholder="Broker email address..."
+                    className="flex-1 bg-white/[0.05] border border-white/[0.08] rounded px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-blue-500/50"
+                  />
+                  <button
+                    onClick={handleSend}
+                    disabled={sending || !brokerEmail}
+                    className="btn-primary text-xs py-2 px-4 whitespace-nowrap"
+                  >
+                    {sending ? 'Sending...' : 'Send LOI →'}
+                  </button>
+                </div>
+              )}
+              {emailError && <div className="text-xs text-red-400">{emailError}</div>}
+              <div className="flex gap-2">
+                <button onClick={handleCopy} className="text-xs py-2 px-4 bg-white/[0.05] border border-white/[0.08] rounded text-slate-300 hover:bg-white/[0.08] flex-1">
+                  {copied ? '✓ Copied!' : 'Copy Text'}
+                </button>
+                <button onClick={handleDownload} className="text-xs py-2 px-4 bg-white/[0.05] border border-white/[0.08] rounded text-slate-300 hover:bg-white/[0.08] flex-1">
+                  Download .txt
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function FinderPage() {
   const [selectedState, setSelectedState] = useState('')
   const [selectedCity, setSelectedCity] = useState('')
@@ -102,6 +237,7 @@ export default function FinderPage() {
   const [searched, setSearched] = useState(false)
   const [addingId, setAddingId] = useState<string | null>(null)
   const [addedIds, setAddedIds] = useState<Set<string>>(new Set())
+  const [loiDeal, setLoiDeal] = useState<any | null>(null)
 
   const cities = selectedState ? STATES[selectedState] || [] : []
 
@@ -161,13 +297,14 @@ export default function FinderPage() {
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
+      {loiDeal && <LOIModal deal={loiDeal} onClose={() => setLoiDeal(null)} />}
+
       <div className="mb-6">
         <h1 className="text-xl font-semibold text-slate-100 font-display">Deal Finder</h1>
         <p className="text-xs text-slate-500 mt-0.5">Search Crexi for deals matching NBRC criteria</p>
       </div>
 
       <div className="card p-5 mb-6">
-        {/* Location Row */}
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div>
             <label className="text-xs text-slate-500 uppercase tracking-widest mb-1 block">State</label>
@@ -189,7 +326,6 @@ export default function FinderPage() {
           </div>
         </div>
 
-        {/* Filters Row */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
           <div>
             <label className="text-xs text-slate-500 uppercase tracking-widest mb-1 block">Min Price</label>
@@ -209,7 +345,6 @@ export default function FinderPage() {
           </div>
         </div>
 
-        {/* Asset Types */}
         <div className="mb-4">
           <label className="text-xs text-slate-500 uppercase tracking-widest mb-2 block">Asset Types</label>
           <div className="flex flex-wrap gap-2">
@@ -258,11 +393,14 @@ export default function FinderPage() {
                       <div><div className="text-xs text-slate-500">DSCR</div><div className="text-sm fin-num text-slate-300">{r.dscr ? r.dscr.toFixed(2) : '—'}</div></div>
                       <div><div className="text-xs text-slate-500">Down</div><div className="text-sm fin-num text-slate-300">{fmtK(r.downPayment)}</div></div>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 flex-wrap">
                       <span className="text-xs bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded">Score: {r.score}</span>
                       {r.url && <a href={r.url} target="_blank" rel="noopener noreferrer" className="text-xs text-slate-400 hover:text-slate-200 underline">View on Crexi</a>}
                       {r.broker && <span className="text-xs text-slate-600">{r.broker}</span>}
                       <div className="flex-1" />
+                      <button onClick={() => setLoiDeal(r)} className="text-xs py-1.5 px-4 bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded hover:bg-amber-500/20 transition-colors">
+                        Generate LOI
+                      </button>
                       {addedIds.has(r.id) ? (
                         <span className="text-xs text-emerald-400">Added to Pipeline</span>
                       ) : (
