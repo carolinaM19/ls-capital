@@ -8,7 +8,7 @@ interface SidebarProps {
   user: { name?: string | null; email?: string | null; role?: string }
 }
 
-const nav = [
+const mainNav = [
   {
     href: '/dashboard',
     label: 'Dashboard',
@@ -20,8 +20,15 @@ const nav = [
     icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" /></svg>,
   },
   {
-    href: '/finder', label: 'Deal Finder', icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 15.803a7.5 7.5 0 0010.607 0z" /></svg> },
-  { href: '/deals/new',
+    href: '/finder',
+    label: 'Deal Finder',
+    icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 15.803a7.5 7.5 0 0010.607 0z" /></svg>,
+  },
+]
+
+const toolsNav = [
+  {
+    href: '/deals/new',
     label: 'Add Deal',
     icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>,
   },
@@ -45,6 +52,9 @@ const nav = [
     label: 'AI Extract',
     icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" /></svg>,
   },
+]
+
+const adminNav = [
   {
     href: '/admin',
     label: 'Admin',
@@ -52,57 +62,68 @@ const nav = [
   },
 ]
 
-export default function Sidebar({ user }: SidebarProps) {
-  const path = usePathname()
-
+function NavGroup({ label, items, path }: { label: string; items: typeof mainNav; path: string }) {
   return (
-    <aside className="w-52 flex flex-col border-r border-white/[0.05] bg-[#0e1017] flex-shrink-0">
-      {/* Brand */}
-      <div className="px-4 py-5 border-b border-white/[0.05]">
-        <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded bg-blue-500/20 border border-blue-500/25 flex items-center justify-center flex-shrink-0">
-            <svg viewBox="0 0 24 24" className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 21h19.5m-18-18v18m10.5-18v18m6-13.5V21M6.75 6.75h.75m-.75 3h.75m-.75 3h.75m3-6h.75m-.75 3h.75m-.75 3h.75M6.75 21v-3.375c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21" />
-            </svg>
-          </div>
-          <div>
-            <div className="text-xs font-semibold text-slate-200 font-display">LS Capital</div>
-            <div className="text-[9px] text-slate-600 tracking-widest uppercase">Deal Intelligence</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Nav */}
-      <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto">
-        {nav.map(item => {
+    <div className="mb-4">
+      <div className="section-label">{label}</div>
+      <div className="space-y-0.5">
+        {items.map(item => {
           const isActive = path === item.href || (item.href !== '/dashboard' && item.href !== '/deals/new' && path.startsWith(item.href))
           return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn('nav-item', isActive && 'active')}
-            >
+            <Link key={item.href} href={item.href} className={cn('nav-item', isActive && 'active')}>
               {item.icon}
               <span>{item.label}</span>
             </Link>
           )
         })}
+      </div>
+    </div>
+  )
+}
+
+export default function Sidebar({ user }: SidebarProps) {
+  const path = usePathname()
+
+  return (
+    <aside className="w-52 flex flex-col flex-shrink-0" style={{background: '#090c12', borderRight: '1px solid rgba(255,255,255,0.05)'}}>
+      {/* Brand */}
+      <div className="px-4 py-5" style={{borderBottom: '1px solid rgba(255,255,255,0.05)'}}>
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+            style={{background: 'linear-gradient(135deg, rgba(79,142,247,0.25) 0%, rgba(139,92,246,0.25) 100%)', border: '1px solid rgba(79,142,247,0.25)'}}>
+            <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.5" style={{color: '#4f8ef7'}}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 21h19.5m-18-18v18m10.5-18v18m6-13.5V21M6.75 6.75h.75m-.75 3h.75m-.75 3h.75m3-6h.75m-.75 3h.75m-.75 3h.75M6.75 21v-3.375c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21" />
+            </svg>
+          </div>
+          <div>
+            <div className="text-xs font-semibold text-slate-100 font-display tracking-tight">LS Capital</div>
+            <div className="text-[9px] text-slate-600 tracking-[0.15em] uppercase">Deal Intelligence</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Nav */}
+      <nav className="flex-1 p-2.5 overflow-y-auto mt-1">
+        <NavGroup label="Overview" items={mainNav} path={path} />
+        <NavGroup label="Tools" items={toolsNav} path={path} />
+        <NavGroup label="System" items={adminNav} path={path} />
       </nav>
 
       {/* User */}
-      <div className="p-3 border-t border-white/[0.05]">
-        <div className="flex items-center gap-2 mb-2 px-1">
-          <div className="w-6 h-6 rounded-full bg-slate-700 flex items-center justify-center text-[10px] text-slate-300 font-medium flex-shrink-0">
+      <div className="p-3" style={{borderTop: '1px solid rgba(255,255,255,0.05)'}}>
+        <div className="flex items-center gap-2.5 px-1 mb-2">
+          <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] text-slate-300 font-semibold flex-shrink-0"
+            style={{background: 'linear-gradient(135deg, #4f8ef7, #8b5cf6)'}}>
             {(user.name ?? user.email ?? '?')[0].toUpperCase()}
           </div>
           <div className="min-w-0">
-            <div className="text-xs text-slate-300 truncate">{user.name ?? 'User'}</div>
+            <div className="text-xs text-slate-200 truncate font-medium">{user.name ?? 'User'}</div>
             <div className="text-[10px] text-slate-600 capitalize">{user.role?.toLowerCase()}</div>
           </div>
         </div>
         <button
           onClick={() => signOut({ callbackUrl: '/login' })}
-          className="w-full text-left px-2 py-1.5 text-xs text-slate-600 hover:text-slate-400 transition-colors rounded"
+          className="w-full text-left px-2 py-1.5 text-xs text-slate-600 hover:text-slate-400 transition-colors rounded-md hover:bg-white/[0.03]"
         >
           Sign out
         </button>
