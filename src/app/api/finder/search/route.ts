@@ -11,11 +11,8 @@ export async function GET(req: NextRequest) {
   const minCapRate = searchParams.get('minCapRate') || ''
   const assetTypes = searchParams.get('assetTypes')?.split(',') || ['MULTI_50_PLUS']
 
-  const token = process.env.APIFY_TOKEN
-  if (!token) return NextResponse.json({ error: 'No Apify token configured' }, { status: 500 })
-
   const propertyTypeMap: Record<string, string> = {
-    'SFR': 'Residential Income',
+    'SFR': 'Single Family',
     'MULTI_2_4': 'Multifamily',
     'MULTI_5_PLUS': 'Multifamily',
     'MULTI_20_30': 'Multifamily',
@@ -25,49 +22,56 @@ export async function GET(req: NextRequest) {
 
   const crexiTypes = [...new Set(assetTypes.map((t: string) => propertyTypeMap[t] || 'Multifamily'))]
 
-  const params = new URLSearchParams()
-  if (city) params.set('location', `${city}${state ? `, ${state}` : ''}`)
-  if (minPrice) params.set('listingMinPrice', String(minPrice))
-  if (maxPrice) params.set('listingMaxPrice', String(maxPrice))
-  crexiTypes.forEach((t: any) => params.append('propertyTypes[]', t))
-
-  const crexiSearchUrl = `https://www.crexi.com/properties?${params.toString()}`
-
   try {
-    const apifyRes = await fetch(
-      `https://api.apify.com/v2/acts/powerai~crexi-listing-scraper/run-sync-get-dataset-items?token=${token}&timeout=60`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ searchUrl: crexiSearchUrl, maxItems: 30 }),
-      }
-    )
+    const filters: any = {
+      propertyTypes: crexiTypes,
+      listingTypes: ['sale'],
+    }
+    if (city || state) filters.location = `${city}${city && state ? ', ' : ''}${state}`
+    if (minPrice) filters.minPrice = parseInt(minPrice)
+    if (maxPrice) filters.maxPrice = parseInt(maxPrice)
+    if (minUnits) filters.minUnits = parseInt(minUnits)
+    if (maxUnits) filters.maxUnits = parseInt(maxUnits)
 
-    const rawText = await apifyRes.text()
-    if (!apifyRes.ok) {
-      return NextResponse.json({ error: `Apify error: ${rawText}` }, { status: 500 })
+    const crexiRes = await fetch('https://api.crexi.com/assets/search', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Origin': 'https://www.crexi.com',
+        'Referer': 'https://www.crexi.com/',
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      },
+      body: JSON.stringify({
+        filters,
+        page: 1,
+        pageSize: 30,
+        sortBy: 'listedAt',
+        sortOrder: 'desc',
+      }),
+    })
+
+    if (!crexiRes.ok) {
+      const errText = await crexiRes.text()
+      return NextResponse.json({ error: `Crexi API error ${crexiRes.status}: ${errText.slice(0, 200)}` }, { status: 500 })
     }
 
-    let rawResults: any[]
-    try {
-      rawResults = JSON.parse(rawText)
-    } catch {
-      return NextResponse.json({ error: `Invalid Apify response: ${rawText.slice(0, 200)}` }, { status: 500 })
-    }
+    const crexiData = await crexiRes.json()
+    const listings = crexiData.results || crexiData.assets || crexiData.data || crexiData || []
 
-    if (!Array.isArray(rawResults)) {
-      return NextResponse.json({ error: 'Unexpected Apify response format', raw: rawResults }, { status: 500 })
+    if (!Array.isArray(listings)) {
+      return NextResponse.json({ error: 'Unexpected Crexi response', raw: JSON.stringify(crexiData).slice(0, 300) }, { status: 500 })
     }
 
     const INTEREST_RATE = 0.0599
     const LTV = 0.80
 
-    const results = rawResults.map((item: any) => {
-      const price = parseFloat((item.price || '').toString().replace(/[$,]/g, '') || '0')
-      const units = parseInt(item.units || item.numberOfUnits || '1')
-      const sqft = parseInt((item.squareFootage || '').toString().replace(/[,]/g, '') || '0')
-      const listedNOI = parseFloat((item.noi || '').toString().replace(/[$,]/g, '') || '0')
-      const listedCapRate = parseFloat((item.capRate || '').toString().replace(/%/g, '') || '0')
+    const results = listings.map((item: any) => {
+      const price = item.askingPrice || item.price || item.listPrice || 0
+      const units = item.units || item.numberOfUnits || item.unitCount || 1
+      const sqft = item.squareFeet || item.sqFt || item.buildingSize || 0
+      const listedCapRate = item.capRate || item.capitalizationRate || 0
+      const listedNOI = item.noi || item.netOperatingIncome || 0
 
       if (!price) return null
       if (minUnits && units < parseInt(minUnits)) return null
@@ -103,26 +107,31 @@ export async function GET(req: NextRequest) {
       if (pricePerUnit > 0 && pricePerUnit <= 80000) score += 10
       else if (pricePerUnit <= 120000) score += 5
 
+      const addressParts = [item.address, item.streetAddress, item.street].filter(Boolean)
+      const address = addressParts[0] || item.name || item.title || 'Unknown address'
+      const itemCity = item.city || city
+      const itemState = item.state || item.stateCode || state
+
       return {
-        id: item.id || item.url || Math.random().toString(),
-        address: item.address || item.name || 'Unknown address',
-        city: item.city || city,
-        state: item.state || state,
+        id: item.id || item.assetId || String(Math.random()),
+        address,
+        city: itemCity,
+        state: itemState,
         price, units, sqft,
-        assetType: item.propertyType || 'Multifamily',
+        assetType: item.propertyType || item.assetType || 'Multifamily',
         capRate: estimatedCapRate,
         noi: estimatedNOI,
         loanAmount, downPayment, monthlyPayment, annualCashFlow, cashOnCash, dscr, pricePerUnit,
         score: Math.min(score, 100),
-        url: item.url || item.propertyUrl,
-        image: item.imageUrl || item.image,
-        broker: item.brokerName || item.broker,
-        daysOnMarket: item.daysOnMarket,
+        url: item.url || item.listingUrl || (item.id ? `https://www.crexi.com/properties/${item.id}` : null),
+        image: item.thumbnailUrl || item.imageUrl || item.primaryImage,
+        broker: item.brokerName || item.listingAgent || item.contactName,
+        daysOnMarket: item.daysOnMarket || item.daysListed,
         source: 'Crexi',
       }
     }).filter(Boolean).sort((a: any, b: any) => b.score - a.score)
 
-    return NextResponse.json({ results, total: results.length, searchUrl: crexiSearchUrl })
+    return NextResponse.json({ results, total: results.length })
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
