@@ -7,6 +7,8 @@ import type { YearProjection } from '@/lib/underwriting'
 
 export default function UnderwritePage() {
   const [inputs, setInputs] = useState({
+    address: '',
+    brokerEmail: '',
     purchasePrice: '',
     grossMonthlyRent: '',
     units: '',
@@ -17,6 +19,12 @@ export default function UnderwritePage() {
     vacancyRate: '5',
     rentGrowthRate: '3',
   })
+  const [loi, setLoi] = useState<string | null>(null)
+  const [loiPrice, setLoiPrice] = useState<number | null>(null)
+  const [loiLoading, setLoiLoading] = useState(false)
+  const [loiSent, setLoiSent] = useState(false)
+  const [loiError, setLoiError] = useState<string | null>(null)
+  const [showLoi, setShowLoi] = useState(false)
 
   const set = (k: string, v: string) => setInputs(p => ({ ...p, [k]: v }))
 
@@ -59,11 +67,45 @@ export default function UnderwritePage() {
     hasYearBuilt: false,
   }) : null
 
-  const inp = (k: string, label: string, placeholder: string) => (
+  const dealPasses = uw && (uw.dscr ?? 0) >= 1.2
+
+  async function generateLOI(send: boolean) {
+    if (!inputs.address || !inputs.purchasePrice) return
+    setLoiLoading(true)
+    setLoiError(null)
+    try {
+      const res = await fetch('/api/loi', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          deal: {
+            address: inputs.address,
+            city: '', state: '',
+            price: parseFloat(inputs.purchasePrice),
+            units: parseInt(inputs.units) || 0,
+            assetType: 'Multifamily',
+          },
+          sendEmail: send,
+          brokerEmail: inputs.brokerEmail,
+        }),
+      })
+      const data = await res.json()
+      setLoi(data.loi)
+      setLoiPrice(data.offerPrice)
+      setLoiSent(data.sent)
+      setShowLoi(true)
+    } catch (e: any) {
+      setLoiError(e.message)
+    } finally {
+      setLoiLoading(false)
+    }
+  }
+
+  const inp = (k: string, label: string, placeholder: string, type = 'number') => (
     <div>
       <label className="block text-xs text-slate-500 mb-1">{label}</label>
       <input
-        type="number"
+        type={type}
         value={inputs[k as keyof typeof inputs]}
         onChange={e => set(k, e.target.value)}
         placeholder={placeholder}
@@ -74,14 +116,42 @@ export default function UnderwritePage() {
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
-      <div className="mb-8">
+      <div className="mb-6">
         <h1 className="text-xl font-semibold text-slate-100 font-display">Deal Underwriter</h1>
-        <p className="text-sm text-slate-500 mt-1">Standalone calculator — structure any deal before saving it to the pipeline</p>
+        <p className="text-sm text-slate-500 mt-1">Run the numbers → send LOI in one flow</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Input panels */}
         <div className="space-y-4">
+
+          {/* Deal identity */}
+          <div className="card p-5">
+            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-4">Property</h3>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs text-slate-500 mb-1">Property Address</label>
+                <input
+                  type="text"
+                  value={inputs.address}
+                  onChange={e => set('address', e.target.value)}
+                  placeholder="1368 West Blvd, Cleveland, OH"
+                  className="w-full h-8 px-2.5 text-sm bg-[#1c1f2a] border border-white/[0.08] rounded text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-500/30"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-500 mb-1">Broker Email (for LOI)</label>
+                <input
+                  type="email"
+                  value={inputs.brokerEmail}
+                  onChange={e => set('brokerEmail', e.target.value)}
+                  placeholder="broker@example.com"
+                  className="w-full h-8 px-2.5 text-sm bg-[#1c1f2a] border border-white/[0.08] rounded text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-500/30"
+                />
+              </div>
+            </div>
+          </div>
+
           <div className="card p-5">
             <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-4">Deal Inputs</h3>
             <div className="space-y-3">
@@ -177,7 +247,6 @@ export default function UnderwritePage() {
               <div className="card p-5">
                 <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-4">Full Underwriting Analysis</h3>
                 <div className="grid grid-cols-2 gap-x-8 gap-y-0">
-                  {/* Loan side */}
                   <div>
                     <div className="text-[10px] text-slate-600 uppercase tracking-widest mb-2">Loan Structure</div>
                     {[
@@ -193,7 +262,6 @@ export default function UnderwritePage() {
                       </div>
                     ))}
                   </div>
-                  {/* Income side */}
                   <div>
                     <div className="text-[10px] text-slate-600 uppercase tracking-widest mb-2">Income & Returns</div>
                     {[
@@ -210,14 +278,12 @@ export default function UnderwritePage() {
                     ))}
                   </div>
                 </div>
-
-                {/* DSCR pass/fail callout */}
                 <div className={`mt-4 p-3 rounded border text-xs ${
-                  (uw.dscr ?? 0) >= 1.2
+                  dealPasses
                     ? 'bg-emerald-500/5 border-emerald-500/20 text-emerald-400'
                     : 'bg-red-500/5 border-red-500/20 text-red-400'
                 }`}>
-                  {(uw.dscr ?? 0) >= 1.2
+                  {dealPasses
                     ? `✓ DSCR ${fmtNum(uw.dscr)} — meets LS Finance minimum (1.20)`
                     : `✗ DSCR ${fmtNum(uw.dscr)} — below LS Finance minimum of 1.20`}
                 </div>
@@ -255,10 +321,87 @@ export default function UnderwritePage() {
                   </div>
                 </div>
               )}
+
+              {/* LOI Section */}
+              <div className={`card p-5 border ${dealPasses ? 'border-emerald-500/20' : 'border-white/[0.06]'}`}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-semibold text-slate-200">Letter of Intent</h3>
+                    {dealPasses
+                      ? <p className="text-xs text-slate-500 mt-0.5">Deal pencils — offer at 10% below asking: <span className="text-emerald-400 fin-num font-semibold">${Math.round(parseFloat(inputs.purchasePrice) * 0.9).toLocaleString()}</span></p>
+                      : <p className="text-xs text-slate-500 mt-0.5">Deal does not meet DSCR minimum — LOI not recommended</p>
+                    }
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => generateLOI(false)}
+                      disabled={!inputs.address || loiLoading}
+                      className="px-3 py-1.5 text-xs rounded border border-white/[0.08] text-slate-400 hover:text-slate-200 hover:bg-white/[0.04] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      Preview LOI
+                    </button>
+                    {dealPasses && (
+                      <button
+                        onClick={() => generateLOI(true)}
+                        disabled={!inputs.address || !inputs.brokerEmail || loiLoading}
+                        className="px-3 py-1.5 text-xs rounded bg-blue-500/20 border border-blue-500/30 text-blue-300 hover:bg-blue-500/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        {loiLoading ? 'Sending...' : 'Send LOI to Broker'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+                {!inputs.address && (
+                  <p className="text-xs text-amber-500/70 mt-3">↑ Add property address above to enable LOI</p>
+                )}
+                {loiError && <p className="text-xs text-red-400 mt-2">{loiError}</p>}
+              </div>
             </>
           )}
         </div>
       </div>
+
+      {/* LOI Modal */}
+      {showLoi && loi && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-6">
+          <div className="bg-[#111318] border border-white/[0.08] rounded-xl w-full max-w-3xl max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.06]">
+              <div>
+                <h2 className="text-sm font-semibold text-slate-200">Letter of Intent</h2>
+                {loiPrice && <p className="text-xs text-slate-500 mt-0.5">Offer price: <span className="text-emerald-400 fin-num">${loiPrice.toLocaleString()}</span></p>}
+              </div>
+              <div className="flex items-center gap-3">
+                {loiSent && <span className="text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-1 rounded">✓ Sent to broker</span>}
+                <button onClick={() => setShowLoi(false)} className="text-slate-500 hover:text-slate-300 transition-colors">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto p-6">
+              <pre className="text-xs text-slate-300 whitespace-pre-wrap font-mono leading-relaxed">{loi}</pre>
+            </div>
+            <div className="px-6 py-4 border-t border-white/[0.06] flex justify-between">
+              <button
+                onClick={() => navigator.clipboard.writeText(loi)}
+                className="px-3 py-1.5 text-xs rounded border border-white/[0.08] text-slate-400 hover:text-slate-200 transition-colors"
+              >
+                Copy to Clipboard
+              </button>
+              {!loiSent && inputs.brokerEmail && (
+                <button
+                  onClick={() => generateLOI(true)}
+                  disabled={loiLoading}
+                  className="px-4 py-1.5 text-xs rounded bg-blue-500/20 border border-blue-500/30 text-blue-300 hover:bg-blue-500/30 transition-colors"
+                >
+                  {loiLoading ? 'Sending...' : `Send to ${inputs.brokerEmail}`}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
