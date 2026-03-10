@@ -15,9 +15,9 @@ const mainNav = [
     icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" /></svg>,
   },
   {
-    href: '/finder',
-    label: 'Deal Finder',
-    icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 15.803a7.5 7.5 0 0010.607 0z" /></svg>,
+    href: '/underwrite',
+    label: 'Underwriter',
+    icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 15.75V18m-7.5-6.75h.008v.008H8.25v-.008zm0 2.25h.008v.008H8.25V13.5zm0 2.25h.008v.008H8.25v-.008zm0 2.25h.008v.008H8.25V18zm2.498-6.75h.007v.008h-.007v-.008zm0 2.25h.007v.008h-.007V13.5zm0 2.25h.007v.008h-.007v-.008zm0 2.25h.007v.008h-.007V18zm2.504-6.75h.008v.008h-.008v-.008zm0 2.25h.008v.008h-.008V13.5zm0 2.25h.008v.008h-.008v-.008zm0 2.25h.008v.008h-.008V18z" /></svg>,
   },
   {
     href: '/deals',
@@ -42,7 +42,6 @@ export default function Sidebar({ user }: SidebarProps) {
 
   return (
     <aside className="w-52 flex flex-col border-r border-white/[0.05] bg-[#0e1017] flex-shrink-0">
-      {/* Brand */}
       <div className="px-4 py-5 border-b border-white/[0.05]">
         <div className="flex items-center gap-2.5">
           <div className="w-7 h-7 rounded bg-blue-500/20 border border-blue-500/25 flex items-center justify-center flex-shrink-0">
@@ -57,7 +56,6 @@ export default function Sidebar({ user }: SidebarProps) {
         </div>
       </div>
 
-      {/* Main Nav */}
       <nav className="flex-1 p-2 overflow-y-auto">
         <div className="space-y-0.5 mb-6">
           {mainNav.map(item => {
@@ -71,7 +69,6 @@ export default function Sidebar({ user }: SidebarProps) {
           })}
         </div>
 
-        {/* More section - de-emphasized */}
         <div>
           <div className="text-[9px] text-slate-700 uppercase tracking-widest px-3 mb-1">More</div>
           <div className="space-y-0.5">
@@ -88,7 +85,6 @@ export default function Sidebar({ user }: SidebarProps) {
         </div>
       </nav>
 
-      {/* User */}
       <div className="p-3 border-t border-white/[0.05]">
         <div className="flex items-center gap-2 mb-2 px-1">
           <div className="w-6 h-6 rounded-full bg-slate-700 flex items-center justify-center text-[10px] text-slate-300 font-medium flex-shrink-0">
