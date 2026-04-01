@@ -193,18 +193,7 @@ export default function UnderwritePage() {
                     <div className="text-[10px] text-slate-600 uppercase tracking-widest mt-1">Cash on Cash</div>
                   </div>
                 </div>
-                {stress && (
-                  <div className="text-right border-l border-white/[0.06] pl-6">
-                    <div className="text-xs text-slate-500 mb-1">Stress Test</div>
-                    <div className="text-xs text-slate-600 mb-1">+200bps / −10% rent</div>
-                    <div className={`text-xl font-bold fin-num ${stress.passes ? 'text-emerald-400' : 'text-red-400'}`}>
-                      {stress.stressedDSCR.toFixed(2)}
-                    </div>
-                    <div className={`text-xs mt-0.5 ${stress.passes ? 'text-emerald-500' : 'text-red-500'}`}>
-                      {stress.passes ? '✓ Passes' : '✗ Fails'}
-                    </div>
-                  </div>
-                )}
+
               </div>
 
               {/* Full breakdown */}
