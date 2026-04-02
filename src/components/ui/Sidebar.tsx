@@ -44,7 +44,7 @@ export default function Sidebar({ user }: SidebarProps) {
             </svg>
           </div>
           <div>
-            <div className="text-xs font-semibold text-slate-200">LS Capital</div>
+            <div className="text-xs font-semibold text-slate-200">NBR Capital</div>
             <div className="text-[9px] text-slate-600 tracking-widest uppercase">Deal Intelligence</div>
           </div>
         </div>
