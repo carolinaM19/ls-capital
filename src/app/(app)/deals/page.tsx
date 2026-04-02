@@ -17,7 +17,7 @@ export default function DealsPage() {
   return (
     <div className="p-6 max-w-6xl mx-auto">
       <div className="mb-6">
-        <h1 className="text-xl font-semibold text-slate-100">Portfolio — All Properties</h1>
+        <h1 className="text-xl font-semibold text-slate-100">Portfolio</h1>
         <p className="text-sm text-slate-500 mt-1">Macon, GA · {properties.length} properties</p>
       </div>
 
