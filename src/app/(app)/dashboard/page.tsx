@@ -98,75 +98,8 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      {/* Cash Flow + Pipeline side by side */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="card p-5">
-          <h2 className="text-sm font-semibold text-slate-300 mb-4">Cash Flow Summary</h2>
-          <div className="space-y-3">
-            {[
-              { label: 'Gross Monthly Rent', value: fmtD(monthlyRentDollars), color: 'text-emerald-400' },
-              { label: 'Monthly Debt Service', value: `– ${fmtD(monthlyDebtDollars)}`, color: 'text-red-400' },
-              { label: 'Monthly NOI', value: fmtD(monthlyNOI), color: 'text-slate-100' },
-              { label: 'Annual NOI', value: fmtD(annualNOI), color: 'text-slate-100' },
-            ].map(row => (
-              <div key={row.label} className="flex justify-between items-center">
-                <span className="text-sm text-slate-400">{row.label}</span>
-                <span className={`text-sm font-semibold fin-num ${row.color}`}>{row.value}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="card p-5">
-          <h2 className="text-sm font-semibold text-slate-300 mb-4">Deal Pipeline</h2>
-          <div className="grid grid-cols-3 gap-3">
-            {[
-              { label: 'New', count: byStatus('NEW'), color: 'text-slate-400' },
-              { label: 'Reviewing', count: byStatus('REVIEWING'), color: 'text-blue-400' },
-              { label: 'Underwriting', count: byStatus('UNDERWRITING'), color: 'text-violet-400' },
-              { label: 'LOI', count: byStatus('LOI'), color: 'text-amber-400' },
-              { label: 'Under Contract', count: byStatus('UNDER_CONTRACT'), color: 'text-orange-400' },
-              { label: 'Closed', count: byStatus('CLOSED'), color: 'text-emerald-400' },
-            ].map(s => (
-              <div key={s.label} className="text-center">
-                <div className={`text-2xl font-bold fin-num ${s.color}`}>{s.count}</div>
-                <div className="text-[10px] text-slate-500 mt-1">{s.label}</div>
-              </div>
-            ))}
-          </div>
-          <div className="mt-4 pt-3 border-t border-white/[0.06]">
-            <Link href="/deals" className="text-xs text-blue-400 hover:text-blue-300 transition-colors">View all deals →</Link>
-          </div>
-        </div>
-      </div>
-
-      {/* Partner Overview — last */}
-      <div className="card p-5">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-semibold text-slate-300">Partner Overview</h2>
-          <span className="text-xs text-slate-500">From balance sheet · Jan 15, 2026</span>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {partners.map(p => (
-            <div key={p.name} className={`card-raised p-4 border ${p.bg}`}>
-              <div className="flex items-center justify-between mb-3">
-                <div>
-                  <div className={`text-sm font-semibold ${p.color}`}>{p.name}</div>
-                  <div className="text-xs text-slate-500">{p.role}</div>
-                </div>
-                <div className={`w-2 h-2 rounded-full ${p.dot}`} />
-              </div>
-              <div className="space-y-1.5 text-xs">
-                <div className="flex justify-between"><span className="text-slate-500">Capital Contributed</span><span className="text-slate-300 fin-num">{fmtD(p.capital)}</span></div>
-                <div className="flex justify-between"><span className="text-slate-500">Cash Flow %</span><span className="text-slate-300">{(p.cashFlowPct * 100).toFixed(0)}%</span></div>
-                <div className="flex justify-between"><span className="text-slate-500">Annual Cash Flow</span><span className={`fin-num ${p.color}`}>{fmtD(annualNOI * p.cashFlowPct)}</span></div>
-                <div className="flex justify-between"><span className="text-slate-500">Equity %</span><span className="text-slate-300">{(p.equityPct * 100).toFixed(1)}%</span></div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
 
     </div>
+
   )
 }
